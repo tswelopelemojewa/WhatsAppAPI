@@ -54,6 +54,11 @@ function verifySignature(req, res, next) {
   // Use timingSafeEqual for security
   const bufSig = Buffer.from(signature, 'hex');
   const bufDigest = Buffer.from(digest, 'hex');
+
+  console.log('Received signature:', req.header('X-Hub-Signature-256'));
+  console.log('Computed digest:', digest);
+  console.log('Payload length:', req.rawBody.length);
+
   if (bufSig.length !== bufDigest.length ||
       !crypto.timingSafeEqual(bufSig, bufDigest)) {
     console.warn('Signature verification failed');
