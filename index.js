@@ -33,8 +33,45 @@ app.get('/webhook', (req, res) => {
 });
 
 // Middleware to verify signature
+// function verifySignature(req, res, next) {
+//   const signatureHeader = req.header('X-Hub-Signature-256');
+//   if (!signatureHeader) {
+//     console.warn('Missing signature header');
+//     return res.sendStatus(401);
+//   }
+
+//   const expectedPrefix = 'sha256=';
+//   if (!signatureHeader.startsWith(expectedPrefix)) {
+//     console.warn('Invalid signature header format');
+//     return res.sendStatus(401);
+//   }
+
+//   const signature = signatureHeader.slice(expectedPrefix.length);
+//   const hmac = crypto.createHmac('sha256', APP_SECRET);
+//   hmac.update(req.rawBody);
+//   const digest = hmac.digest('hex');
+
+//   // Use timingSafeEqual for security
+//   const bufSig = Buffer.from(signature, 'hex');
+//   const bufDigest = Buffer.from(digest, 'hex');
+
+//   console.log('Received signature:', req.header('X-Hub-Signature-256'));
+//   console.log('Computed digest:', digest);
+//   console.log('Payload length:', req.rawBody.length);
+
+//   if (bufSig.length !== bufDigest.length ||
+//       !crypto.timingSafeEqual(bufSig, bufDigest)) {
+//     console.warn('Signature verification failed');
+//     return res.sendStatus(401);
+//   }
+
+//   // signature OK, proceed
+//   next();
+// }
+
 function verifySignature(req, res, next) {
   const signatureHeader = req.header('X-Hub-Signature-256');
+  console.log('Header raw:', signatureHeader);
   if (!signatureHeader) {
     console.warn('Missing signature header');
     return res.sendStatus(401);
@@ -42,32 +79,38 @@ function verifySignature(req, res, next) {
 
   const expectedPrefix = 'sha256=';
   if (!signatureHeader.startsWith(expectedPrefix)) {
-    console.warn('Invalid signature header format');
+    console.warn('Invalid signature header format:', signatureHeader);
     return res.sendStatus(401);
   }
 
-  const signature = signatureHeader.slice(expectedPrefix.length);
+  const receivedSignatureHex = signatureHeader.slice(expectedPrefix.length);
+  const rawBodyBuffer = req.rawBody;
+  console.log('Raw body (utf8):', rawBodyBuffer.toString('utf8'));
+  console.log('Raw body (hex):', rawBodyBuffer.toString('hex').slice(0,100) + '…'); // truncated for readability
+  console.log('Raw body length:', rawBodyBuffer.length);
+
   const hmac = crypto.createHmac('sha256', APP_SECRET);
-  hmac.update(req.rawBody);
-  const digest = hmac.digest('hex');
+  hmac.update(rawBodyBuffer);
+  const computedDigestHex = hmac.digest('hex');
+  console.log('Computed digest hex:', computedDigestHex);
 
-  // Use timingSafeEqual for security
-  const bufSig = Buffer.from(signature, 'hex');
-  const bufDigest = Buffer.from(digest, 'hex');
+  try {
+    const bufSig = Buffer.from(receivedSignatureHex, 'hex');
+    const bufDigest = Buffer.from(computedDigestHex, 'hex');
 
-  console.log('Received signature:', req.header('X-Hub-Signature-256'));
-  console.log('Computed digest:', digest);
-  console.log('Payload length:', req.rawBody.length);
-
-  if (bufSig.length !== bufDigest.length ||
-      !crypto.timingSafeEqual(bufSig, bufDigest)) {
-    console.warn('Signature verification failed');
+    if (bufSig.length !== bufDigest.length || !crypto.timingSafeEqual(bufSig, bufDigest)) {
+      console.warn('Signature did not match');
+      return res.sendStatus(401);
+    }
+  } catch(err) {
+    console.error('Error during signature comparison', err);
     return res.sendStatus(401);
   }
 
-  // signature OK, proceed
+  console.log('✅ Signature verification passed');
   next();
 }
+
 
 // POST route for receiving webhook events
 app.post('/webhook', verifySignature, (req, res) => {
