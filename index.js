@@ -6,6 +6,9 @@ const crypto = require('crypto');
 const bodyParser = require('body-parser');
 const axios = require('axios'); // <-- NEW: Required for sending messages
 
+const dotenv = require('dotenv');
+dotenv.config(); // Load environment variables from .env file
+
 const app = express();
 
 // --- Configuration (Ensure these environment variables are set in Render) ---
